@@ -19,6 +19,9 @@ export default function Room() {
   const [socketId, setSocketId] = useState(null)
   const [copied, setCopied] = useState(false)
   const [replaced, setReplaced] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editAvatar, setEditAvatar] = useState('')
   const socketRef = useRef(null)
 
   // Load saved name + avatar
@@ -32,17 +35,14 @@ export default function Room() {
     }
   }, [])
 
-  // Connect and join room when we have both name and roomId
+  // Connect once we have a roomId
   useEffect(() => {
-    if (!name || !roomId) return
+    if (!roomId) return
 
     const socket = io()
     socketRef.current = socket
 
-    socket.on('connect', () => {
-      setSocketId(socket.id)
-      socket.emit('join-room', { roomId, name, avatar })
-    })
+    socket.on('connect', () => setSocketId(socket.id))
 
     socket.on('room-state', (state) => {
       setRoomState(state)
@@ -61,7 +61,14 @@ export default function Room() {
       setSocketId(null)
       setRoomState(null)
     }
-  }, [name, avatar, roomId])
+  }, [roomId])
+
+  // (Re)join the room whenever our identity changes — same socket, so an
+  // in-progress vote is preserved (see server's rejoin handling).
+  useEffect(() => {
+    if (!name || !socketId || !socketRef.current) return
+    socketRef.current.emit('join-room', { roomId, name, avatar })
+  }, [name, avatar, socketId, roomId])
 
   const handleNameSubmit = (e) => {
     e.preventDefault()
@@ -71,6 +78,23 @@ export default function Room() {
     localStorage.setItem('poker-planning-avatar', avatarInput)
     setName(trimmed)
     setAvatar(avatarInput)
+  }
+
+  const openProfileEditor = () => {
+    setEditName(name)
+    setEditAvatar(avatar)
+    setEditOpen(true)
+  }
+
+  const saveProfile = (e) => {
+    e.preventDefault()
+    const trimmed = editName.trim()
+    if (!trimmed) return
+    localStorage.setItem('poker-planning-name', trimmed)
+    localStorage.setItem('poker-planning-avatar', editAvatar)
+    setName(trimmed)
+    setAvatar(editAvatar)
+    setEditOpen(false)
   }
 
   const pickCard = (value) => {
@@ -213,6 +237,69 @@ export default function Room() {
           >
             {copied ? '✓ Copied!' : 'Copy Link'}
           </button>
+          <div className="relative">
+            <button
+              onClick={() => (editOpen ? setEditOpen(false) : openProfileEditor())}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white transition hover:bg-white/10"
+            >
+              <span className="text-base leading-none">{avatar || '🙂'}</span>
+              <span className="max-w-[80px] truncate">{name}</span>
+            </button>
+
+            {editOpen && (
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-72 rounded-2xl border border-white/10 bg-[#0d0b16] p-4 shadow-2xl shadow-black/50">
+                <form onSubmit={saveProfile} className="flex flex-col gap-3">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="Your name"
+                    maxLength={30}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-indigo-400/60 focus:bg-white/[0.07] focus:outline-none"
+                  />
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {AVATARS.map(a => {
+                      const selected = editAvatar === a
+                      return (
+                        <button
+                          key={a}
+                          type="button"
+                          onClick={() => setEditAvatar(a)}
+                          aria-label={`Avatar ${a}`}
+                          className={`
+                            flex h-9 w-9 items-center justify-center rounded-lg border-2 text-lg transition
+                            ${selected
+                              ? 'border-transparent bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg shadow-indigo-900/40'
+                              : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                            }
+                          `}
+                        >
+                          {a}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditOpen(false)}
+                      className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm text-white transition hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!editName.trim()}
+                      className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/5 disabled:text-slate-500 disabled:shadow-none"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
