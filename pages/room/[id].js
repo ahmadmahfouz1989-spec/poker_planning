@@ -4,13 +4,16 @@ import Head from 'next/head'
 import { io } from 'socket.io-client'
 
 const CARDS = ['1', '2', '3', '5', '8', '13', '21', '?', '☕']
+const AVATARS = ['🙂', '🦊', '🐼', '🐸', '🐵', '🐧', '🦁', '🐨', '🐯', '🐙', '🦄', '🐝']
 
 export default function Room() {
   const router = useRouter()
   const { id: roomId } = router.query
 
   const [name, setName] = useState('')
+  const [avatar, setAvatar] = useState('')
   const [nameInput, setNameInput] = useState('')
+  const [avatarInput, setAvatarInput] = useState(AVATARS[0])
   const [roomState, setRoomState] = useState(null)
   const [myVote, setMyVote] = useState(null)
   const [socketId, setSocketId] = useState(null)
@@ -18,10 +21,15 @@ export default function Room() {
   const [replaced, setReplaced] = useState(false)
   const socketRef = useRef(null)
 
-  // Load saved name
+  // Load saved name + avatar
   useEffect(() => {
     const saved = localStorage.getItem('poker-planning-name')
     if (saved) setName(saved)
+    const savedAvatar = localStorage.getItem('poker-planning-avatar')
+    if (savedAvatar) {
+      setAvatar(savedAvatar)
+      setAvatarInput(savedAvatar)
+    }
   }, [])
 
   // Connect and join room when we have both name and roomId
@@ -33,7 +41,7 @@ export default function Room() {
 
     socket.on('connect', () => {
       setSocketId(socket.id)
-      socket.emit('join-room', { roomId, name })
+      socket.emit('join-room', { roomId, name, avatar })
     })
 
     socket.on('room-state', (state) => {
@@ -53,14 +61,16 @@ export default function Room() {
       setSocketId(null)
       setRoomState(null)
     }
-  }, [name, roomId])
+  }, [name, avatar, roomId])
 
   const handleNameSubmit = (e) => {
     e.preventDefault()
     const trimmed = nameInput.trim()
     if (!trimmed) return
     localStorage.setItem('poker-planning-name', trimmed)
+    localStorage.setItem('poker-planning-avatar', avatarInput)
     setName(trimmed)
+    setAvatar(avatarInput)
   }
 
   const pickCard = (value) => {
@@ -137,6 +147,31 @@ export default function Room() {
               maxLength={30}
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 transition focus:border-indigo-400/60 focus:bg-white/[0.07] focus:outline-none"
             />
+
+            <p className="mt-1 text-left text-xs font-medium text-slate-500">Pick an avatar</p>
+            <div className="grid grid-cols-6 gap-2">
+              {AVATARS.map(a => {
+                const selected = avatarInput === a
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAvatarInput(a)}
+                    aria-label={`Avatar ${a}`}
+                    className={`
+                      flex h-11 w-11 items-center justify-center rounded-xl border-2 text-xl transition
+                      ${selected
+                        ? 'border-transparent bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg shadow-indigo-900/40'
+                        : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                      }
+                    `}
+                  >
+                    {a}
+                  </button>
+                )
+              })}
+            </div>
+
             <button
               type="submit"
               disabled={!nameInput.trim()}
@@ -326,8 +361,9 @@ function PlayerCard({ participant, revealed, isMe }) {
           </div>
         </div>
       </div>
-      <span className={`text-xs max-w-[64px] truncate text-center ${isMe ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}>
-        {isMe ? 'You' : participant.name}
+      <span className={`flex items-center gap-1 max-w-[80px] text-xs ${isMe ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}>
+        <span className="text-sm leading-none">{participant.avatar || '🙂'}</span>
+        <span className="truncate">{isMe ? 'You' : participant.name}</span>
       </span>
     </div>
   )

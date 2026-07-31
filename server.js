@@ -7,7 +7,7 @@ const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev })
 const handle = app.getRequestHandler()
 
-// roomId -> { participants: Map<socketId, { name, vote }>, revealed: bool }
+// roomId -> { participants: Map<socketId, { name, avatar, vote }>, revealed: bool }
 const rooms = new Map()
 
 function getOrCreateRoom(roomId) {
@@ -22,6 +22,7 @@ function getRoomState(room) {
     participants: Array.from(room.participants.entries()).map(([id, p]) => ({
       id,
       name: p.name,
+      avatar: p.avatar,
       voted: p.vote !== null,
       vote: room.revealed ? p.vote : null,
     })),
@@ -53,7 +54,7 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     socket._roomId = null
 
-    socket.on('join-room', ({ roomId, name }) => {
+    socket.on('join-room', ({ roomId, name, avatar }) => {
       if (!roomId || !name) return
 
       // Leave previous room if switching
@@ -85,9 +86,11 @@ app.prepare().then(() => {
 
       // Preserve vote if rejoining (e.g., page refresh)
       if (!room.participants.has(socket.id)) {
-        room.participants.set(socket.id, { name, vote: null })
+        room.participants.set(socket.id, { name, avatar: avatar || '🙂', vote: null })
       } else {
-        room.participants.get(socket.id).name = name
+        const participant = room.participants.get(socket.id)
+        participant.name = name
+        participant.avatar = avatar || '🙂'
       }
 
       io.to(roomId).emit('room-state', getRoomState(room))
@@ -120,7 +123,8 @@ app.prepare().then(() => {
     socket.on('disconnect', () => cleanupSocket(socket, io))
   })
 
-  httpServer.listen(3000, () => {
-    console.log('> Ready on http://localhost:3000')
+  const port = process.env.PORT || 3000
+  httpServer.listen(port, () => {
+    console.log(`> Ready on http://localhost:${port}`)
   })
 })
