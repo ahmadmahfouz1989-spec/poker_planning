@@ -13,6 +13,7 @@ const rooms = new Map()
 function getOrCreateRoom(roomId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, { participants: new Map(), revealed: false })
+    console.log(`[room-created] room=${roomId}`)
   }
   return rooms.get(roomId)
 }
@@ -37,6 +38,7 @@ function cleanupSocket(socket, io) {
   room.participants.delete(socket.id)
   if (room.participants.size === 0) {
     rooms.delete(socket._roomId)
+    console.log(`[room-closed] room=${socket._roomId}`)
   } else {
     io.to(socket._roomId).emit('room-state', getRoomState(room))
   }
@@ -87,6 +89,7 @@ app.prepare().then(() => {
       // Preserve vote if rejoining (e.g., page refresh)
       if (!room.participants.has(socket.id)) {
         room.participants.set(socket.id, { name, avatar: avatar || '🙂', vote: null })
+        console.log(`[join] room=${roomId} name="${name}"`)
       } else {
         const participant = room.participants.get(socket.id)
         participant.name = name
@@ -102,6 +105,7 @@ app.prepare().then(() => {
       const participant = room.participants.get(socket.id)
       if (!participant) return
       participant.vote = value ?? null
+      console.log(`[vote] room=${roomId} name="${participant.name}" vote=${value ?? 'null'}`)
       io.to(roomId).emit('room-state', getRoomState(room))
     })
 
@@ -109,6 +113,8 @@ app.prepare().then(() => {
       const room = rooms.get(roomId)
       if (!room || room.revealed) return
       room.revealed = true
+      const votes = Array.from(room.participants.values()).map((p) => `${p.name}=${p.vote ?? '-'}`).join(', ')
+      console.log(`[reveal] room=${roomId} votes=[${votes}]`)
       io.to(roomId).emit('room-state', getRoomState(room))
     })
 
@@ -117,6 +123,7 @@ app.prepare().then(() => {
       if (!room) return
       room.revealed = false
       for (const p of room.participants.values()) p.vote = null
+      console.log(`[reset] room=${roomId}`)
       io.to(roomId).emit('room-state', getRoomState(room))
     })
 
