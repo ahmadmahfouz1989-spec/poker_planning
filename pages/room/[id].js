@@ -4,7 +4,16 @@ import Head from 'next/head'
 import { io } from 'socket.io-client'
 
 const CARDS = ['1', '2', '3', '5', '8', '13', '21', '?', '☕']
-const AVATARS = ['🙂', '🦊', '🐼', '🐸', '🐵', '🐧', '🦁', '🐨', '🐯', '🐙', '🦄', '🐝']
+const AVATARS = [
+  '🙂', '🦊', '🐼', '🐸', '🐵', '🐧',
+  '🦁', '🐨', '🐯', '🐙', '🦄', '🐝',
+  '🐶', '🐱', '🐰', '🐻', '🐮', '🐷',
+  '🐔', '🦉', '🐢', '🦋', '🐳', '🦒',
+  '🐺', '🐹', '🐭', '🐴', '🦌', '🐐',
+  '🐑', '🦏', '🐍', '🦑', '🦀', '🦆',
+  '😎', '🤖', '👽', '👻', '🎃', '🥷',
+  '🧙', '🦸', '🐲', '🔥', '⭐', '🍕',
+]
 
 export default function Room() {
   const router = useRouter()
@@ -46,10 +55,14 @@ export default function Room() {
 
     socket.on('room-state', (state) => {
       setRoomState(state)
+      const me = state.participants.find(p => p.id === socket.id)
       if (state.revealed) {
         // Show my actual vote from server during reveal
-        const me = state.participants.find(p => p.id === socket.id)
         if (me) setMyVote(me.vote)
+      } else if (me && !me.voted) {
+        // Round was reset (e.g. someone else clicked "Next Story") —
+        // clear my local pick so it doesn't linger from the last story
+        setMyVote(null)
       }
     })
 
